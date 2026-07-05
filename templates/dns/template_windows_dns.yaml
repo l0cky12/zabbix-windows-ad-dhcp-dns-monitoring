@@ -1,0 +1,280 @@
+zabbix_export:
+  version: '6.0'
+  date: '2026-07-05T12:00:00Z'
+  template_groups:
+    - uuid: "ad100000-0000-4000-8000-000000000003"
+      name: "Templates/Windows/DNS"
+  templates:
+    - uuid: "ad200000-0000-4000-8000-000000000003"
+      template: "Windows DNS by Zabbix agent"
+      name: "Windows DNS by Zabbix agent"
+      description: |
+        Template for monitoring DNS Server role on Windows Server.
+        Monitors DNS Server service availability, synthetic DNS query resolution
+        (A record, SOA, SRV _ldap._tcp.dc._msdcs), and DNS AD-integrated
+        startup readiness via Event ID 4013 monitoring.
+
+        Dependencies:
+        - Zabbix agent 6.0+ with UserParameter definitions (see README)
+        - PowerShell 5.1+ execution policy allowing script execution
+        - PowerShell scripts in /scripts/windows/ directory
+        - Access to run Resolve-DnsName and related DNS diagnostic cmdlets
+      vendor:
+        name: "Nous Research"
+        version: "1.0.0"
+      groups:
+        - name: "Templates/Windows/DNS"
+      items:
+        # 1. DNS Server service status
+        - uuid: "ad240000-0000-4000-8000-000000000001"
+          name: "DNS: DNS Server service status"
+          type: ZABBIX_PASSIVE
+          key_: "windows.dns.service.status"
+          delay: "1m"
+          value_type: UNSIGNED
+          description: |
+            Checks the DNS Server service status via PowerShell Get-Service.
+            Returns 1 if Running, 0 if not running or stopped.
+          tags:
+            - tag: "component"
+              value: "dns"
+            - tag: "scope"
+              value: "availability"
+            - tag: "priority"
+              value: "critical"
+          triggers:
+            - uuid: "ad241000-0000-4000-8000-000000000001"
+              expression: "avg(/Windows DNS by Zabbix agent/windows.dns.service.status,{$DNS_SERVICE_DOWN_TIMEOUT})=0"
+              name: "DNS: DNS Server service is not running on {HOST.HOST}"
+              priority: CRITICAL
+              description: |
+                The DNS Server service has been stopped for more than
+                {$DNS_SERVICE_DOWN_TIMEOUT}. Name resolution for the
+                Active Directory domain and clients is unavailable.
+                Severity: CRITICAL when sustained for {$DNS_SERVICE_DOWN_TIMEOUT}.
+              tags:
+                - tag: "component"
+                  value: "dns"
+                - tag: "scope"
+                  value: "availability"
+                - tag: "priority"
+                  value: "critical"
+
+        # 2. DNS synthetic queries - A record resolution
+        - uuid: "ad240000-0000-4000-8000-000000000002"
+          name: "DNS: A record query result"
+          type: ZABBIX_PASSIVE
+          key_: "windows.dns.query.a"
+          delay: "5m"
+          value_type: UNSIGNED
+          description: |
+            Performs a synthetic A record query for the domain's DC hostname
+            via PowerShell Resolve-DnsName. Returns 1 if resolved successfully,
+            0 if resolution failed.
+          tags:
+            - tag: "component"
+              value: "dns"
+            - tag: "scope"
+              value: "synthetic-query"
+            - tag: "priority"
+              value: "critical"
+
+        # 2. DNS synthetic queries - SOA resolution
+        - uuid: "ad240000-0000-4000-8000-000000000003"
+          name: "DNS: SOA query result"
+          type: ZABBIX_PASSIVE
+          key_: "windows.dns.query.soa"
+          delay: "5m"
+          value_type: UNSIGNED
+          description: |
+            Performs a synthetic SOA query for the AD DNS zone via
+            PowerShell Resolve-DnsName. Returns 1 if resolved successfully,
+            0 if resolution failed.
+          tags:
+            - tag: "component"
+              value: "dns"
+            - tag: "scope"
+              value: "synthetic-query"
+            - tag: "priority"
+              value: "critical"
+
+        # 2. DNS synthetic queries - SRV _ldap._tcp.dc._msdcs resolution
+        - uuid: "ad240000-0000-4000-8000-000000000004"
+          name: "DNS: _ldap._tcp.dc._msdcs SRV record count"
+          type: ZABBIX_PASSIVE
+          key_: "windows.dns.query.srv.ldap"
+          delay: "5m"
+          value_type: UNSIGNED
+          description: |
+            Queries _ldap._tcp.dc._msdcs.<domain> SRV records via
+            PowerShell Resolve-DnsName. Returns the count of domain
+            controller SRV records returned. 0 indicates no DCs are
+            advertising via LDAP SRV records.
+          tags:
+            - tag: "component"
+              value: "dns"
+            - tag: "scope"
+              value: "synthetic-query"
+            - tag: "priority"
+              value: "critical"
+          triggers:
+            - uuid: "ad241000-0000-4000-8000-000000000002"
+              expression: "last(/Windows DNS by Zabbix agent/windows.dns.query.a)=0 or last(/Windows DNS by Zabbix agent/windows.dns.query.soa)=0"
+              name: "DNS: Synthetic query failure (A/SOA) on {HOST.HOST}"
+              priority: CRITICAL
+              description: |
+                The DNS server failed to answer one or more synthetic queries
+                (A record or SOA query). Name resolution for the AD domain
+                may be impaired.
+                Severity: CRITICAL (immediate on failure).
+              tags:
+                - tag: "component"
+                  value: "dns"
+                - tag: "scope"
+                  value: "synthetic-query"
+                - tag: "priority"
+                  value: "critical"
+            - uuid: "ad241000-0000-4000-8000-000000000004"
+              expression: "last(/Windows DNS by Zabbix agent/windows.dns.query.srv.ldap)=0"
+              name: "DNS: No _ldap._tcp.dc._msdcs SRV records returned on {HOST.HOST}"
+              priority: CRITICAL
+              description: |
+                Zero _ldap._tcp.dc._msdcs SRV records were returned.
+                No domain controllers are advertising LDAP services.
+                Clients cannot locate DCs for authentication.
+                Severity: CRITICAL (immediate).
+              tags:
+                - tag: "component"
+                  value: "dns"
+                - tag: "scope"
+                  value: "synthetic-query"
+                - tag: "priority"
+                  value: "critical"
+
+        # DNS Service uptime (used by Event 4013 triggers)
+        - uuid: "ad240000-0000-4000-8000-00000000000a"
+          name: "DNS: DNS Server uptime (seconds)"
+          type: ZABBIX_PASSIVE
+          key_: "windows.dns.service.uptime"
+          delay: "1m"
+          value_type: UNSIGNED
+          units: "s"
+          description: |
+            Returns the uptime of the DNS Server service in seconds.
+            Used to calculate how long Event 4013 has persisted relative
+            to service startup.
+          tags:
+            - tag: "component"
+              value: "dns"
+            - tag: "scope"
+              value: "startup"
+            - tag: "priority"
+              value: "info"
+
+        # 3. DNS Event 4013 (AD-integrated startup delay)
+        - uuid: "ad240000-0000-4000-8000-000000000005"
+          name: "DNS: Event 4013 (AD startup delay)"
+          type: ZABBIX_ACTIVE
+          key_: "eventlog[DNS Server,,4013,,,,0]"
+          delay: "0"
+          value_type: LOG
+          description: |
+            Monitors DNS Server event log for Event ID 4013.
+            Indicates that the DNS server is waiting for Active Directory
+            Domain Services to start before loading AD-integrated zones.
+            Normal during early boot, problematic if persistent.
+          tags:
+            - tag: "component"
+              value: "dns"
+            - tag: "scope"
+              value: "startup"
+            - tag: "priority"
+              value: "critical"
+          triggers:
+            - uuid: "ad241000-0000-4000-8000-000000000005a"
+              expression: "last(/Windows DNS by Zabbix agent/eventlog[DNS Server,,4013,,,,0])>0 and last(/Windows DNS by Zabbix agent/eventlog[DNS Server,,4013,,,,0],#2)=0"
+              name: "DNS: Event 4013 post-reboot cleared on {HOST.HOST}"
+              priority: HIGH
+              description: |
+                Event ID 4013 appeared after a recent reboot but has cleared
+                within the {$DNS_STARTUP_WARN_TIMEOUT} window. This is normal
+                behavior during AD DS startup.
+                Severity: HIGH (informational recovery).
+              tags:
+                - tag: "component"
+                  value: "dns"
+                - tag: "scope"
+                  value: "startup"
+                - tag: "priority"
+                  value: "high"
+            - uuid: "ad241000-0000-4000-8000-000000000005b"
+              expression: "last(/Windows DNS by Zabbix agent/eventlog[DNS Server,,4013,,,,0])>0 and last(/Windows DNS by Zabbix agent/windows.dns.service.uptime)-last(/Windows DNS by Zabbix agent/eventlog[DNS Server,,4013,,,,0].time)>{$DNS_STARTUP_CRIT_TIMEOUT}"
+              name: "DNS: Event 4013 persistent - AD startup delayed on {HOST.HOST}"
+              priority: CRITICAL
+              description: |
+                Event ID 4013 has persisted for more than
+                {$DNS_STARTUP_CRIT_TIMEOUT} since server boot. AD-integrated
+                DNS zones are not loaded. DNS resolution for the AD domain
+                is unavailable.
+                Severity: CRITICAL.
+              tags:
+                - tag: "component"
+                  value: "dns"
+                - tag: "scope"
+                  value: "startup"
+                - tag: "priority"
+                  value: "critical"
+
+        # 5. DNS unexpected Event 4013 outside maintenance windows
+        - uuid: "ad240000-0000-4000-8000-000000000006"
+          name: "DNS: Event 4013 unexpected (outside maintenance)"
+          type: ZABBIX_ACTIVE
+          key_: "eventlog[DNS Server,,4013,,,,0]"
+          delay: "0"
+          value_type: LOG
+          description: |
+            Monitors DNS Server event log for Event ID 4013 appearing outside
+            normal maintenance windows. Unexpected 4013 events during
+            business hours indicate AD DS or DNS service instability.
+          tags:
+            - tag: "component"
+              value: "dns"
+            - tag: "scope"
+              value: "startup"
+            - tag: "priority"
+              value: "critical"
+          triggers:
+            - uuid: "ad241000-0000-4000-8000-000000000006"
+              expression: "last(/Windows DNS by Zabbix agent/eventlog[DNS Server,,4013,,,,0])>0 and last(/Windows DNS by Zabbix agent/windows.dns.service.uptime)>{$DNS_STARTUP_CRIT_TIMEOUT}"
+              name: "DNS: Unexpected Event 4013 outside maintenance window on {HOST.HOST}"
+              priority: CRITICAL
+              description: |
+                Event ID 4013 has been detected on a server that has been
+                running for more than {$DNS_STARTUP_CRIT_TIMEOUT}. This
+                indicates an unexpected DNS AD-integrated zone loading
+                issue outside of normal startup/maintenance windows.
+                Severity: CRITICAL.
+              tags:
+                - tag: "component"
+                  value: "dns"
+                - tag: "scope"
+                  value: "startup"
+                - tag: "priority"
+                  value: "critical"
+
+      macros:
+        - macro: "{$DNS_SERVICE_DOWN_TIMEOUT}"
+          value: "2m"
+          description: "Time after which DNS Server service outage escalates to CRITICAL"
+        - macro: "{$DNS_STARTUP_WARN_TIMEOUT}"
+          value: "15m"
+          description: "Time window for normal Event 4013 post-reboot startup delay (WARNING)"
+        - macro: "{$DNS_STARTUP_CRIT_TIMEOUT}"
+          value: "20m"
+          description: "Time after which persistent Event 4013 escalates to CRITICAL"
+
+      dashboards: []
+      discovery_rules: []
+      graphs: []
+      http_tests: []
+      template_link: []

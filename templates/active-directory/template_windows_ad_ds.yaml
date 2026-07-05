@@ -1,0 +1,515 @@
+zabbix_export:
+  version: '6.0'
+  date: '2026-07-05T12:00:00Z'
+  template_groups:
+    - uuid: "ad100000-0000-4000-8000-000000000001"
+      name: "Templates/Windows/Active Directory"
+  templates:
+    - uuid: "ad200000-0000-4000-8000-000000000001"
+      template: "Windows AD DS by Zabbix agent"
+      name: "Windows AD DS by Zabbix agent"
+      description: |
+        Template for monitoring Active Directory Domain Services health on Windows Server.
+        Monitors dcdiag tests, AD replication (repadmin), SYSVOL/NETLOGON share availability,
+        DFSR health, time synchronization (w32tm), and critical AD-related Windows Event Log events.
+        Requires UserParameters configured on the Zabbix agent and supporting PowerShell scripts
+        located in /scripts/windows/ on the monitored host.
+
+        Dependencies:
+        - Zabbix agent 6.0+ with UserParameter definitions (see README)
+        - PowerShell 5.1+ execution policy allowing script execution
+        - PowerShell scripts in /scripts/windows/ directory
+        - Access to run dcdiag, repadmin, w32tm, and DFSR diagnostic commands
+      vendor:
+        name: "Nous Research"
+        version: "1.0.0"
+      groups:
+        - name: "Templates/Windows/Active Directory"
+      items:
+        # 1. dcdiag /test:Services
+        - uuid: "ad210000-0000-4000-8000-000000000001"
+          name: "AD: dcdiag /test:Services"
+          type: ZABBIX_PASSIVE
+          key_: "windows.ad.dcdiag.services"
+          delay: "5m"
+          value_type: TEXT
+          description: |
+            Executes dcdiag /test:Services via PowerShell and returns PASS or FAIL.
+            Tests that core AD DS services (NTDS, KDC, DFSR, DNS, etc.) are running.
+            Returns "0" for PASS, "1" for FAIL.
+          tags:
+            - tag: "component"
+              value: "active-directory"
+            - tag: "scope"
+              value: "availability"
+            - tag: "priority"
+              value: "critical"
+          triggers:
+            - uuid: "ad211000-0000-4000-8000-000000000001"
+              expression: "avg(/Windows AD DS by Zabbix agent/windows.ad.dcdiag.services,{$AD_SERVICE_DOWN_TIMEOUT})>0"
+              name: "AD: dcdiag /test:Services failed on {HOST.HOST}"
+              priority: CRITICAL
+              description: |
+                One or more core AD DS services are not running as expected.
+                Check the dcdiag output for which service(s) failed.
+                Severity: CRITICAL when sustained for {$AD_SERVICE_DOWN_TIMEOUT}.
+              tags:
+                - tag: "component"
+                  value: "active-directory"
+                - tag: "scope"
+                  value: "availability"
+                - tag: "priority"
+                  value: "critical"
+
+        # 2. dcdiag /test:Advertising
+        - uuid: "ad210000-0000-4000-8000-000000000002"
+          name: "AD: dcdiag /test:Advertising"
+          type: ZABBIX_PASSIVE
+          key_: "windows.ad.dcdiag.advertising"
+          delay: "5m"
+          value_type: TEXT
+          description: |
+            Executes dcdiag /test:Advertising via PowerShell and returns PASS or FAIL.
+            Tests whether the DC is correctly advertising itself via DNS SRV records
+            (LDAP, Kerberos, etc.). Returns "0" for PASS, "1" for FAIL.
+          tags:
+            - tag: "component"
+              value: "active-directory"
+            - tag: "scope"
+              value: "advertising"
+            - tag: "priority"
+              value: "critical"
+          triggers:
+            - uuid: "ad211000-0000-4000-8000-000000000002"
+              expression: "avg(/Windows AD DS by Zabbix agent/windows.ad.dcdiag.advertising,{$AD_SERVICE_DOWN_TIMEOUT})>0"
+              name: "AD: dcdiag /test:Advertising failed on {HOST.HOST}"
+              priority: CRITICAL
+              description: |
+                This DC is not advertising itself properly via DNS.
+                Clients may not be able to locate this domain controller.
+                Severity: CRITICAL when sustained for {$AD_SERVICE_DOWN_TIMEOUT}.
+              tags:
+                - tag: "component"
+                  value: "active-directory"
+                - tag: "scope"
+                  value: "advertising"
+                - tag: "priority"
+                  value: "critical"
+
+        # 3. repadmin /replsummary - replication failures
+        - uuid: "ad210000-0000-4000-8000-000000000003"
+          name: "AD: Replication failure count"
+          type: ZABBIX_PASSIVE
+          key_: "windows.ad.replication.failures"
+          delay: "5m"
+          value_type: UNSIGNED
+          description: |
+            Executes repadmin /replsummary via PowerShell and returns the count
+            of replication failures (Fails column). 0 means all replications successful.
+          tags:
+            - tag: "component"
+              value: "active-directory"
+            - tag: "scope"
+              value: "replication"
+            - tag: "priority"
+              value: "critical"
+          triggers:
+            - uuid: "ad211000-0000-4000-8000-000000000003"
+              expression: "min(/Windows AD DS by Zabbix agent/windows.ad.replication.failures,{$AD_REPL_FAILURE_TIMEOUT})>0"
+              name: "AD: Replication failures detected on {HOST.HOST}"
+              priority: CRITICAL
+              description: |
+                AD replication failures have been detected for more than
+                {$AD_REPL_FAILURE_TIMEOUT}. Run repadmin /replsummary for details.
+                Severity: CRITICAL when sustained for {$AD_REPL_FAILURE_TIMEOUT}.
+              tags:
+                - tag: "component"
+                  value: "active-directory"
+                - tag: "scope"
+                  value: "replication"
+                - tag: "priority"
+                  value: "critical"
+
+        # 4. Oldest last-success replication time
+        - uuid: "ad210000-0000-4000-8000-000000000004"
+          name: "AD: Oldest replication age (hours)"
+          type: ZABBIX_PASSIVE
+          key_: "windows.ad.replication.oldest.age"
+          delay: "5m"
+          value_type: UNSIGNED
+          description: |
+            Returns the age in hours of the oldest successful replication.
+            Calculated from repadmin /replsummary output. High values indicate
+            replication problems even if failures count is zero.
+            Value type: UNSIGNED (hours).
+          tags:
+            - tag: "component"
+              value: "active-directory"
+            - tag: "scope"
+              value: "replication"
+            - tag: "priority"
+              value: "critical"
+
+        # 5. SYSVOL share existence
+        - uuid: "ad210000-0000-4000-8000-000000000005"
+          name: "AD: SYSVOL share available"
+          type: ZABBIX_PASSIVE
+          key_: "windows.ad.sysvol.share"
+          delay: "5m"
+          value_type: UNSIGNED
+          description: |
+            Checks whether the SYSVOL share (\\{HOST.HOST}\SYSVOL) is available
+            via PowerShell. Returns 1 if accessible, 0 if missing.
+          tags:
+            - tag: "component"
+              value: "active-directory"
+            - tag: "scope"
+              value: "sysvol"
+            - tag: "priority"
+              value: "critical"
+          triggers:
+            - uuid: "ad211000-0000-4000-8000-000000000005"
+              expression: "last(/Windows AD DS by Zabbix agent/windows.ad.sysvol.share)=0"
+              name: "AD: SYSVOL share is missing on {HOST.HOST}"
+              priority: CRITICAL
+              description: |
+                The SYSVOL share is not available. This prevents Group Policy
+                processing and domain client logons.
+                Severity: CRITICAL (immediate).
+              tags:
+                - tag: "component"
+                  value: "active-directory"
+                - tag: "scope"
+                  value: "sysvol"
+                - tag: "priority"
+                  value: "critical"
+
+        # 6. NETLOGON share existence
+        - uuid: "ad210000-0000-4000-8000-000000000006"
+          name: "AD: NETLOGON share available"
+          type: ZABBIX_PASSIVE
+          key_: "windows.ad.netlogon.share"
+          delay: "5m"
+          value_type: UNSIGNED
+          description: |
+            Checks whether the NETLOGON share (\\{HOST.HOST}\NETLOGON) is available
+            via PowerShell. Returns 1 if accessible, 0 if missing.
+          tags:
+            - tag: "component"
+              value: "active-directory"
+            - tag: "scope"
+              value: "sysvol"
+            - tag: "priority"
+              value: "critical"
+          triggers:
+            - uuid: "ad211000-0000-4000-8000-000000000006"
+              expression: "last(/Windows AD DS by Zabbix agent/windows.ad.netlogon.share)=0"
+              name: "AD: NETLOGON share is missing on {HOST.HOST}"
+              priority: CRITICAL
+              description: |
+                The NETLOGON share is not available. This prevents user logon
+                processing and script application.
+                Severity: CRITICAL (immediate).
+              tags:
+                - tag: "component"
+                  value: "active-directory"
+                - tag: "scope"
+                  value: "sysvol"
+                - tag: "priority"
+                  value: "critical"
+
+        # 7. DFSR state for SYSVOL
+        - uuid: "ad210000-0000-4000-8000-000000000007"
+          name: "AD: DFSR SYSVOL state"
+          type: ZABBIX_PASSIVE
+          key_: "windows.ad.dfsr.sysvol.state"
+          delay: "5m"
+          value_type: UNSIGNED
+          description: |
+            Returns the DFSR state for the SYSVOL replicated folder.
+            Expected value: 4 (Normal). Other values indicate initialization
+            or error states.
+          tags:
+            - tag: "component"
+              value: "active-directory"
+            - tag: "scope"
+              value: "dfsr"
+            - tag: "priority"
+              value: "critical"
+          triggers:
+            - uuid: "ad211000-0000-4000-8000-000000000007"
+              expression: "min(/Windows AD DS by Zabbix agent/windows.ad.dfsr.sysvol.state,{$AD_DFSR_UNHEALTHY_TIMEOUT})<>4"
+              name: "AD: DFSR SYSVOL state is not Normal on {HOST.HOST}"
+              priority: CRITICAL
+              description: |
+                DFSR state for SYSVOL has not returned to Normal (4) for more than
+                {$AD_DFSR_UNHEALTHY_TIMEOUT}. Check DFSR backlog and event logs.
+                Severity: CRITICAL when sustained for {$AD_DFSR_UNHEALTHY_TIMEOUT}.
+              tags:
+                - tag: "component"
+                  value: "active-directory"
+                - tag: "scope"
+                  value: "dfsr"
+                - tag: "priority"
+                  value: "critical"
+
+        # 8. DFSR Event 2213 from Windows Event Log
+        - uuid: "ad210000-0000-4000-8000-000000000008"
+          name: "AD: DFSR Event 2213 (SYSVOL non-authoritative sync)"
+          type: ZABBIX_ACTIVE
+          key_: "eventlog[DFS Replication,,2213,,,,0]"
+          delay: "0"
+          value_type: LOG
+          description: |
+            Monitors DFS Replication event log for Event ID 2213.
+            This event indicates that SYSVOL has completed initial sync in
+            non-authoritative restore mode. Immediate attention required.
+          tags:
+            - tag: "component"
+              value: "active-directory"
+            - tag: "scope"
+              value: "dfsr"
+            - tag: "priority"
+              value: "critical"
+          triggers:
+            - uuid: "ad211000-0000-4000-8000-000000000008"
+              expression: "last(/Windows AD DS by Zabbix agent/eventlog[DFS Replication,,2213,,,,0])>0"
+              name: "AD: DFSR Event 2213 detected on {HOST.HOST}"
+              priority: CRITICAL
+              description: |
+                DFSR Event ID 2213 has been detected. The DFS Replication service
+                has completed initial synchronization of SYSVOL in non-authoritative
+                restore mode. Verify SYSVOL content is consistent across all DCs.
+                Severity: CRITICAL (immediate).
+              tags:
+                - tag: "component"
+                  value: "active-directory"
+                - tag: "scope"
+                  value: "dfsr"
+                - tag: "priority"
+                  value: "critical"
+
+        # 9. DFSR Event 4012 from Windows Event Log
+        - uuid: "ad210000-0000-4000-8000-000000000009"
+          name: "AD: DFSR Event 4012 (SYSVOL replication error)"
+          type: ZABBIX_ACTIVE
+          key_: "eventlog[DFS Replication,,4012,,,,0]"
+          delay: "0"
+          value_type: LOG
+          description: |
+            Monitors DFS Replication event log for Event ID 4012.
+            This event indicates a DFSR replication error for SYSVOL,
+            typically caused by a journal wrap or USN rollback.
+          tags:
+            - tag: "component"
+              value: "active-directory"
+            - tag: "scope"
+              value: "dfsr"
+            - tag: "priority"
+              value: "critical"
+          triggers:
+            - uuid: "ad211000-0000-4000-8000-000000000009"
+              expression: "last(/Windows AD DS by Zabbix agent/eventlog[DFS Replication,,4012,,,,0])>0"
+              name: "AD: DFSR Event 4012 detected on {HOST.HOST}"
+              priority: CRITICAL
+              description: |
+                DFSR Event ID 4012 has been detected. The DFS Replication service
+                has encountered a SYSVOL replication error (journal wrap/USN rollback).
+                Immediate intervention is required to restore SYSVOL replication.
+                Severity: CRITICAL (immediate).
+              tags:
+                - tag: "component"
+                  value: "active-directory"
+                - tag: "scope"
+                  value: "dfsr"
+                - tag: "priority"
+                  value: "critical"
+
+        # 10. W32Time service health
+        - uuid: "ad210000-0000-4000-8000-000000000010"
+          name: "AD: W32Time service status"
+          type: ZABBIX_PASSIVE
+          key_: "windows.ad.w32time.status"
+          delay: "1m"
+          value_type: UNSIGNED
+          description: |
+            Checks the Windows Time (W32Time) service status.
+            Returns 1 if Running, 0 if not running.
+          tags:
+            - tag: "component"
+              value: "active-directory"
+            - tag: "scope"
+              value: "time-sync"
+            - tag: "priority"
+              value: "high"
+
+        # 11. Clock offset to time source via w32tm /stripchart
+        - uuid: "ad210000-0000-4000-8000-000000000011"
+          name: "AD: Time sync offset (seconds)"
+          type: ZABBIX_PASSIVE
+          key_: "windows.ad.time.offset"
+          delay: "1m"
+          value_type: UNSIGNED
+          description: |
+            Returns the absolute clock offset in seconds between this DC and
+            its configured time source, measured via w32tm /stripchart.
+            Kerberos requires time skew less than 5 minutes (300 seconds).
+          tags:
+            - tag: "component"
+              value: "active-directory"
+            - tag: "scope"
+              value: "time-sync"
+            - tag: "priority"
+              value: "critical"
+          triggers:
+            - uuid: "ad211000-0000-4000-8000-000000000011a"
+              expression: "min(/Windows AD DS by Zabbix agent/windows.ad.time.offset,{$AD_TIME_OFFSET_DURATION})>={$AD_TIME_OFFSET_WARN}"
+              name: "AD: Clock offset exceeded {$AD_TIME_OFFSET_WARN}s warning threshold on {HOST.HOST}"
+              priority: HIGH
+              description: |
+                Clock offset is above {$AD_TIME_OFFSET_WARN} seconds.
+                Kerberos authentication may be affected if offset exceeds
+                5 minutes (300 seconds). Current offset > {$AD_TIME_OFFSET_WARN}s.
+                Severity: HIGH when sustained for {$AD_TIME_OFFSET_DURATION}.
+              tags:
+                - tag: "component"
+                  value: "active-directory"
+                - tag: "scope"
+                  value: "time-sync"
+                - tag: "priority"
+                  value: "high"
+            - uuid: "ad211000-0000-4000-8000-000000000011b"
+              expression: "min(/Windows AD DS by Zabbix agent/windows.ad.time.offset,{$AD_TIME_OFFSET_DURATION})>={$AD_TIME_OFFSET_CRIT}"
+              name: "AD: Clock offset critical ({$AD_TIME_OFFSET_CRIT}s) on {HOST.HOST}"
+              priority: CRITICAL
+              description: |
+                Clock offset has reached {$AD_TIME_OFFSET_CRIT} seconds.
+                Kerberos authentication will fail. Immediate time sync
+                correction required.
+                Severity: CRITICAL when sustained for {$AD_TIME_OFFSET_DURATION}.
+              tags:
+                - tag: "component"
+                  value: "active-directory"
+                - tag: "scope"
+                  value: "time-sync"
+                - tag: "priority"
+                  value: "critical"
+
+        # 12. PDC emulator time health
+        - uuid: "ad210000-0000-4000-8000-000000000012"
+          name: "AD: PDC emulator time health"
+          type: ZABBIX_PASSIVE
+          key_: "windows.ad.pdc.time.health"
+          delay: "5m"
+          value_type: UNSIGNED
+          description: |
+            Checks if this DC holds the PDC emulator FSMO role and reports
+            the time health status. Returns 0 if healthy, 1 if errors detected.
+            For PDCe: also validates external time source reachability.
+          tags:
+            - tag: "component"
+              value: "active-directory"
+            - tag: "scope"
+              value: "time-sync"
+            - tag: "priority"
+              value: "high"
+
+        # 13. Event 2042 (replication tombstone exceeded)
+        - uuid: "ad210000-0000-4000-8000-000000000013"
+          name: "AD: Event 2042 (tombstone lifetime exceeded)"
+          type: ZABBIX_ACTIVE
+          key_: "eventlog[Directory Service,,2042,,,,0]"
+          delay: "0"
+          value_type: LOG
+          description: |
+            Monitors Directory Service event log for Event ID 2042.
+            This critical event indicates a replication partner has been
+            offline longer than the tombstone lifetime, requiring
+            metadata cleanup or forced removal.
+          tags:
+            - tag: "component"
+              value: "active-directory"
+            - tag: "scope"
+              value: "replication"
+            - tag: "priority"
+              value: "critical"
+          triggers:
+            - uuid: "ad211000-0000-4000-8000-000000000013"
+              expression: "last(/Windows AD DS by Zabbix agent/eventlog[Directory Service,,2042,,,,0])>0"
+              name: "AD: Critical Event 2042 - tombstone lifetime exceeded on {HOST.HOST}"
+              priority: CRITICAL
+              description: |
+                Event ID 2042 detected. A domain controller has been offline
+                longer than the tombstone lifetime (default: 180 days).
+                NTDS metadata cleanup is required. Do NOT allow this DC to
+                replicate without authoritative restore.
+                Severity: CRITICAL (immediate).
+              tags:
+                - tag: "component"
+                  value: "active-directory"
+                - tag: "scope"
+                  value: "replication"
+                - tag: "priority"
+                  value: "critical"
+
+        # 14. Replication error 8614 via Event Log
+        - uuid: "ad210000-0000-4000-8000-000000000014"
+          name: "AD: Event 8614 (replication error)"
+          type: ZABBIX_ACTIVE
+          key_: "eventlog[Directory Service,,8614,,,,0]"
+          delay: "0"
+          value_type: LOG
+          description: |
+            Monitors Directory Service event log for Event ID 8614.
+            This event indicates a replication error where the directory
+            service has failed to replicate with a remote DC.
+          tags:
+            - tag: "component"
+              value: "active-directory"
+            - tag: "scope"
+              value: "replication"
+            - tag: "priority"
+              value: "critical"
+          triggers:
+            - uuid: "ad211000-0000-4000-8000-000000000014"
+              expression: "last(/Windows AD DS by Zabbix agent/eventlog[Directory Service,,8614,,,,0])>0"
+              name: "AD: Event 8614 - replication error on {HOST.HOST}"
+              priority: CRITICAL
+              description: |
+                Event ID 8614 detected. The directory service has failed to
+                replicate with one or more remote domain controllers.
+                Check network connectivity and replication topology.
+                Severity: CRITICAL (immediate).
+              tags:
+                - tag: "component"
+                  value: "active-directory"
+                - tag: "scope"
+                  value: "replication"
+                - tag: "priority"
+                  value: "critical"
+
+      macros:
+        - macro: "{$AD_SERVICE_DOWN_TIMEOUT}"
+          value: "2m"
+          description: "Time after which a dcdiag test failure is escalated to CRITICAL"
+        - macro: "{$AD_REPL_FAILURE_TIMEOUT}"
+          value: "15m"
+          description: "Time after which sustained replication failures trigger CRITICAL"
+        - macro: "{$AD_DFSR_UNHEALTHY_TIMEOUT}"
+          value: "10m"
+          description: "Time after which a non-Normal DFSR state triggers CRITICAL"
+        - macro: "{$AD_TIME_OFFSET_WARN}"
+          value: "180"
+          description: "Clock offset warning threshold in seconds (3 minutes)"
+        - macro: "{$AD_TIME_OFFSET_CRIT}"
+          value: "300"
+          description: "Clock offset critical threshold in seconds (5 minutes)"
+        - macro: "{$AD_TIME_OFFSET_DURATION}"
+          value: "5m"
+          description: "Duration the clock offset must exceed threshold before triggering"
+
+      dashboards: []
+      discovery_rules: []
+      graphs: []
+      http_tests: []
+      template_link: []

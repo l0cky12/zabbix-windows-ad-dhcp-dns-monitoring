@@ -1,0 +1,56 @@
+# Logs
+*.log
+*.ps1xml
+
+# Images / media
+*.svg
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.ico
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+ehthumbs.db
+
+# Editor temporaries
+*.swp
+*.swo
+*~
+*.bak
+*.tmp
+
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+secrets/
+credentials/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+
+# Node
+node_modules/
+npm-debug.log*
+
+# IDE / project files
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+.project
+.classpath
+.settings/
+
+# Zabbix export artifacts
+*.zbx
+*.zbx.old

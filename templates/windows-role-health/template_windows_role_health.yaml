@@ -1,0 +1,436 @@
+zabbix_export:
+  version: '6.0'
+  date: '2026-07-05T12:00:00Z'
+  template_groups:
+    - uuid: "ad100000-0000-4000-8000-000000000004"
+      name: "Templates/Windows/Role Health"
+  templates:
+    - uuid: "ad200000-0000-4000-8000-000000000004"
+      template: "Windows Role Health by Zabbix agent"
+      name: "Windows Role Health by Zabbix agent"
+      description: |
+        Template for monitoring Windows Server role health on domain controllers
+        and DHCP/DNS servers. Monitors disk free space on role-relevant volumes
+        (NTDS database, AD logs, SYSVOL, DHCP data), OS volume capacity via LLD,
+        and shared time synchronization health (W32Time, clock offset).
+
+        This template is designed to be linked alongside the AD DS, DHCP, or DNS
+        templates as a supplementary role-health baseline. It does NOT duplicate
+        the service-critical checks from those templates but adds the infrastructure
+        health layer (disk and time) that keeps those roles stable.
+
+        Dependencies:
+        - Zabbix agent 6.0+ with UserParameter definitions (see README)
+        - PowerShell 5.1+ execution policy allowing script execution
+        - PowerShell scripts in /scripts/windows/ directory
+        - Access to query WMI/Get-Volume and locate role-specific paths
+      vendor:
+        name: "Nous Research"
+        version: "1.0.0"
+      groups:
+        - name: "Templates/Windows/Role Health"
+      items:
+        # 6. W32Time service health (shared time sync base check)
+        - uuid: "ad250000-0000-4000-8000-000000000001"
+          name: "Role Health: W32Time service status"
+          type: ZABBIX_PASSIVE
+          key_: "windows.health.w32time.status"
+          delay: "1m"
+          value_type: UNSIGNED
+          description: |
+            Checks the Windows Time (W32Time) service status via PowerShell
+            Get-Service. Returns 1 if Running, 0 if not running.
+            Shared time sync base check for all roles.
+          tags:
+            - tag: "component"
+              value: "role-health"
+            - tag: "scope"
+              value: "time-sync"
+            - tag: "priority"
+              value: "high"
+
+        # 7. Clock offset check (shared)
+        - uuid: "ad250000-0000-4000-8000-000000000002"
+          name: "Role Health: Time sync offset (seconds)"
+          type: ZABBIX_PASSIVE
+          key_: "windows.health.time.offset"
+          delay: "1m"
+          value_type: UNSIGNED
+          units: "s"
+          description: |
+            Returns the absolute clock offset in seconds measured via
+            w32tm /stripchart. Shared time sync check for all roles.
+          tags:
+            - tag: "component"
+              value: "role-health"
+            - tag: "scope"
+              value: "time-sync"
+            - tag: "priority"
+              value: "high"
+
+        # 2. Volume holding NTDS database free space
+        - uuid: "ad250000-0000-4000-8000-000000000003"
+          name: "Role Health: NTDS database volume free space (%)"
+          type: ZABBIX_PASSIVE
+          key_: "windows.health.disk.ntds.pct"
+          delay: "5m"
+          value_type: FLOAT
+          units: "%"
+          description: |
+            Returns the free space percentage on the volume hosting the NTDS
+            database (ntds.dit). Located by querying the registry
+            HKLM\SYSTEM\CurrentControlSet\Services\NTDS\Parameters\DSA Database file.
+          tags:
+            - tag: "component"
+              value: "role-health"
+            - tag: "scope"
+              value: "disk-capacity"
+            - tag: "priority"
+              value: "critical"
+          triggers:
+            - uuid: "ad251000-0000-4000-8000-000000000001a"
+              expression: "last(/Windows Role Health by Zabbix agent/windows.health.disk.ntds.pct)<{$ROLE_DISK_FREE_PCT_WARN} or last(/Windows Role Health by Zabbix agent/windows.health.disk.ntds.gb)<{$ROLE_DISK_FREE_GB_WARN}"
+              name: "Role Health: NTDS database volume low on space ({$ROLE_DISK_FREE_PCT_WARN}% / {$ROLE_DISK_FREE_GB_WARN}GB) on {HOST.HOST}"
+              priority: HIGH
+              description: |
+                Free space on the NTDS database volume is below
+                {$ROLE_DISK_FREE_PCT_WARN}% or {$ROLE_DISK_FREE_GB_WARN}GB.
+                Insufficient space can cause database corruption or
+                transaction log truncation failures.
+                Severity: HIGH.
+              tags:
+                - tag: "component"
+                  value: "role-health"
+                - tag: "scope"
+                  value: "disk-capacity"
+                - tag: "priority"
+                  value: "high"
+            - uuid: "ad251000-0000-4000-8000-000000000001b"
+              expression: "last(/Windows Role Health by Zabbix agent/windows.health.disk.ntds.pct)<{$ROLE_DISK_FREE_PCT_CRIT} or last(/Windows Role Health by Zabbix agent/windows.health.disk.ntds.gb)<{$ROLE_DISK_FREE_GB_CRIT}"
+              name: "Role Health: NTDS database volume critically low on space ({$ROLE_DISK_FREE_PCT_CRIT}% / {$ROLE_DISK_FREE_GB_CRIT}GB) on {HOST.HOST}"
+              priority: CRITICAL
+              description: |
+                Free space on the NTDS database volume is below
+                {$ROLE_DISK_FREE_PCT_CRIT}% or {$ROLE_DISK_FREE_GB_CRIT}GB.
+                Immediate action required to prevent AD DS database
+                corruption or service outage.
+                Severity: CRITICAL.
+              tags:
+                - tag: "component"
+                  value: "role-health"
+                - tag: "scope"
+                  value: "disk-capacity"
+                - tag: "priority"
+                  value: "critical"
+
+        # 2b. Volume holding NTDS database free space (GB)
+        - uuid: "ad250000-0000-4000-8000-000000000004"
+          name: "Role Health: NTDS database volume free space (GB)"
+          type: ZABBIX_PASSIVE
+          key_: "windows.health.disk.ntds.gb"
+          delay: "5m"
+          value_type: FLOAT
+          units: "GB"
+          description: |
+            Returns the free space in GB on the volume hosting the NTDS
+            database. Used for GB-threshold trigger evaluation.
+          tags:
+            - tag: "component"
+              value: "role-health"
+            - tag: "scope"
+              value: "disk-capacity"
+            - tag: "priority"
+              value: "critical"
+
+        # 3. Volume holding AD logs free space
+        - uuid: "ad250000-0000-4000-8000-000000000005"
+          name: "Role Health: AD logs volume free space (%)"
+          type: ZABBIX_PASSIVE
+          key_: "windows.health.disk.adlogs.pct"
+          delay: "5m"
+          value_type: FLOAT
+          units: "%"
+          description: |
+            Returns the free space percentage on the volume hosting AD DS
+            database log files (EDB*.log). Located by querying the registry
+            HKLM\SYSTEM\CurrentControlSet\Services\NTDS\Parameters\DSA Log file.
+          tags:
+            - tag: "component"
+              value: "role-health"
+            - tag: "scope"
+              value: "disk-capacity"
+            - tag: "priority"
+              value: "critical"
+          triggers:
+            - uuid: "ad251000-0000-4000-8000-000000000002a"
+              expression: "last(/Windows Role Health by Zabbix agent/windows.health.disk.adlogs.pct)<{$ROLE_DISK_FREE_PCT_WARN} or last(/Windows Role Health by Zabbix agent/windows.health.disk.adlogs.gb)<{$ROLE_DISK_FREE_GB_WARN}"
+              name: "Role Health: AD logs volume low on space ({$ROLE_DISK_FREE_PCT_WARN}% / {$ROLE_DISK_FREE_GB_WARN}GB) on {HOST.HOST}"
+              priority: HIGH
+              description: |
+                Free space on the AD DS transaction log volume is below
+                {$ROLE_DISK_FREE_PCT_WARN}% or {$ROLE_DISK_FREE_GB_WARN}GB.
+                Log file growth may halt, causing AD DS to pause.
+                Severity: HIGH.
+              tags:
+                - tag: "component"
+                  value: "role-health"
+                - tag: "scope"
+                  value: "disk-capacity"
+                - tag: "priority"
+                  value: "high"
+            - uuid: "ad251000-0000-4000-8000-000000000002b"
+              expression: "last(/Windows Role Health by Zabbix agent/windows.health.disk.adlogs.pct)<{$ROLE_DISK_FREE_PCT_CRIT} or last(/Windows Role Health by Zabbix agent/windows.health.disk.adlogs.gb)<{$ROLE_DISK_FREE_GB_CRIT}"
+              name: "Role Health: AD logs volume critically low on space ({$ROLE_DISK_FREE_PCT_CRIT}% / {$ROLE_DISK_FREE_GB_CRIT}GB) on {HOST.HOST}"
+              priority: CRITICAL
+              description: |
+                Free space on the AD DS transaction log volume is below
+                {$ROLE_DISK_FREE_PCT_CRIT}% or {$ROLE_DISK_FREE_GB_CRIT}GB.
+                AD DS may pause database operations to prevent log corruption.
+                Severity: CRITICAL.
+              tags:
+                - tag: "component"
+                  value: "role-health"
+                - tag: "scope"
+                  value: "disk-capacity"
+                - tag: "priority"
+                  value: "critical"
+
+        # 3b. Volume holding AD logs free space (GB)
+        - uuid: "ad250000-0000-4000-8000-000000000006"
+          name: "Role Health: AD logs volume free space (GB)"
+          type: ZABBIX_PASSIVE
+          key_: "windows.health.disk.adlogs.gb"
+          delay: "5m"
+          value_type: FLOAT
+          units: "GB"
+          description: |
+            Returns the free space in GB on the volume hosting AD DS logs.
+            Used for GB-threshold trigger evaluation.
+          tags:
+            - tag: "component"
+              value: "role-health"
+            - tag: "scope"
+              value: "disk-capacity"
+            - tag: "priority"
+              value: "critical"
+
+        # 4. Volume holding SYSVOL free space
+        - uuid: "ad250000-0000-4000-8000-000000000007"
+          name: "Role Health: SYSVOL volume free space (%)"
+          type: ZABBIX_PASSIVE
+          key_: "windows.health.disk.sysvol.pct"
+          delay: "5m"
+          value_type: FLOAT
+          units: "%"
+          description: |
+            Returns the free space percentage on the volume hosting SYSVOL.
+            Located by resolving the SYSVOL share target path from
+            net share or registry.
+          tags:
+            - tag: "component"
+              value: "role-health"
+            - tag: "scope"
+              value: "disk-capacity"
+            - tag: "priority"
+              value: "critical"
+          triggers:
+            - uuid: "ad251000-0000-4000-8000-000000000003a"
+              expression: "last(/Windows Role Health by Zabbix agent/windows.health.disk.sysvol.pct)<{$ROLE_DISK_FREE_PCT_WARN} or last(/Windows Role Health by Zabbix agent/windows.health.disk.sysvol.gb)<{$ROLE_DISK_FREE_GB_WARN}"
+              name: "Role Health: SYSVOL volume low on space ({$ROLE_DISK_FREE_PCT_WARN}% / {$ROLE_DISK_FREE_GB_WARN}GB) on {HOST.HOST}"
+              priority: HIGH
+              description: |
+                Free space on the SYSVOL volume is below
+                {$ROLE_DISK_FREE_PCT_WARN}% or {$ROLE_DISK_FREE_GB_WARN}GB.
+                SYSVOL replication may be affected.
+                Severity: HIGH.
+              tags:
+                - tag: "component"
+                  value: "role-health"
+                - tag: "scope"
+                  value: "disk-capacity"
+                - tag: "priority"
+                  value: "high"
+            - uuid: "ad251000-0000-4000-8000-000000000003b"
+              expression: "last(/Windows Role Health by Zabbix agent/windows.health.disk.sysvol.pct)<{$ROLE_DISK_FREE_PCT_CRIT} or last(/Windows Role Health by Zabbix agent/windows.health.disk.sysvol.gb)<{$ROLE_DISK_FREE_GB_CRIT}"
+              name: "Role Health: SYSVOL volume critically low on space ({$ROLE_DISK_FREE_PCT_CRIT}% / {$ROLE_DISK_FREE_GB_CRIT}GB) on {HOST.HOST}"
+              priority: CRITICAL
+              description: |
+                Free space on the SYSVOL volume is below
+                {$ROLE_DISK_FREE_PCT_CRIT}% or {$ROLE_DISK_FREE_GB_CRIT}GB.
+                SYSVOL replication failures and GPO access issues may occur.
+                Severity: CRITICAL.
+              tags:
+                - tag: "component"
+                  value: "role-health"
+                - tag: "scope"
+                  value: "disk-capacity"
+                - tag: "priority"
+                  value: "critical"
+
+        # 4b. Volume holding SYSVOL free space (GB)
+        - uuid: "ad250000-0000-4000-8000-000000000008"
+          name: "Role Health: SYSVOL volume free space (GB)"
+          type: ZABBIX_PASSIVE
+          key_: "windows.health.disk.sysvol.gb"
+          delay: "5m"
+          value_type: FLOAT
+          units: "GB"
+          description: |
+            Returns the free space in GB on the volume hosting SYSVOL.
+            Used for GB-threshold trigger evaluation.
+          tags:
+            - tag: "component"
+              value: "role-health"
+            - tag: "scope"
+              value: "disk-capacity"
+            - tag: "priority"
+              value: "critical"
+
+        # 5. Volume holding DHCP data free space
+        - uuid: "ad250000-0000-4000-8000-000000000009"
+          name: "Role Health: DHCP data volume free space (%)"
+          type: ZABBIX_PASSIVE
+          key_: "windows.health.disk.dhcp.pct"
+          delay: "5m"
+          value_type: FLOAT
+          units: "%"
+          description: |
+            Returns the free space percentage on the volume hosting DHCP
+            database files (dhcp.mdb, *.mdb, *.log). Located by querying
+            the registry HKLM\SYSTEM\CurrentControlSet\Services\DHCPServer\Parameters\DatabasePath.
+          tags:
+            - tag: "component"
+              value: "role-health"
+            - tag: "scope"
+              value: "disk-capacity"
+            - tag: "priority"
+              value: "critical"
+          triggers:
+            - uuid: "ad251000-0000-4000-8000-000000000004a"
+              expression: "last(/Windows Role Health by Zabbix agent/windows.health.disk.dhcp.pct)<{$ROLE_DISK_FREE_PCT_WARN} or last(/Windows Role Health by Zabbix agent/windows.health.disk.dhcp.gb)<{$ROLE_DISK_FREE_GB_WARN}"
+              name: "Role Health: DHCP data volume low on space ({$ROLE_DISK_FREE_PCT_WARN}% / {$ROLE_DISK_FREE_GB_WARN}GB) on {HOST.HOST}"
+              priority: HIGH
+              description: |
+                Free space on the DHCP database volume is below
+                {$ROLE_DISK_FREE_PCT_WARN}% or {$ROLE_DISK_FREE_GB_WARN}GB.
+                DHCP lease logging and database operations may fail.
+                Severity: HIGH.
+              tags:
+                - tag: "component"
+                  value: "role-health"
+                - tag: "scope"
+                  value: "disk-capacity"
+                - tag: "priority"
+                  value: "high"
+            - uuid: "ad251000-0000-4000-8000-000000000004b"
+              expression: "last(/Windows Role Health by Zabbix agent/windows.health.disk.dhcp.pct)<{$ROLE_DISK_FREE_PCT_CRIT} or last(/Windows Role Health by Zabbix agent/windows.health.disk.dhcp.gb)<{$ROLE_DISK_FREE_GB_CRIT}"
+              name: "Role Health: DHCP data volume critically low on space ({$ROLE_DISK_FREE_PCT_CRIT}% / {$ROLE_DISK_FREE_GB_CRIT}GB) on {HOST.HOST}"
+              priority: CRITICAL
+              description: |
+                Free space on the DHCP database volume is below
+                {$ROLE_DISK_FREE_PCT_CRIT}% or {$ROLE_DISK_FREE_GB_CRIT}GB.
+                DHCP service may fail to respond to client requests.
+                Severity: CRITICAL.
+              tags:
+                - tag: "component"
+                  value: "role-health"
+                - tag: "scope"
+                  value: "disk-capacity"
+                - tag: "priority"
+                  value: "critical"
+
+        # 5b. Volume holding DHCP data free space (GB)
+        - uuid: "ad250000-0000-4000-8000-00000000000a"
+          name: "Role Health: DHCP data volume free space (GB)"
+          type: ZABBIX_PASSIVE
+          key_: "windows.health.disk.dhcp.gb"
+          delay: "5m"
+          value_type: FLOAT
+          units: "GB"
+          description: |
+            Returns the free space in GB on the volume hosting DHCP data.
+            Used for GB-threshold trigger evaluation.
+          tags:
+            - tag: "component"
+              value: "role-health"
+            - tag: "scope"
+              value: "disk-capacity"
+            - tag: "priority"
+              value: "critical"
+
+      discovery_rules:
+        # LLD: Discover all fixed drives
+        - uuid: "ad260000-0000-4000-8000-000000000001"
+          name: "Role Health: Fixed disk discovery"
+          type: ZABBIX_PASSIVE
+          key_: "windows.health.discover.disks"
+          delay: "1h"
+          value_type: TEXT
+          description: |
+            Discovers all fixed (local) drives via PowerShell Get-Volume
+            or Get-WmiObject Win32_LogicalDisk. Returns JSON LLD data
+            with {#DISK_LETTER}, {#DISK_LABEL}, {#DISK_SIZE_GB} macros.
+            Includes OS system drive and all data drives.
+          filter:
+            evaltype: AND
+            conditions:
+              - macro: "{#DISK_LETTER}"
+                value: "^[A-Z]$"
+                formulaid: A
+          item_prototypes:
+            - uuid: "ad261000-0000-4000-8000-000000000001"
+              name: "{#DISK_LETTER}: free space percentage"
+              type: ZABBIX_PASSIVE
+              key_: "windows.health.disk.pct[{#DISK_LETTER}]"
+              delay: "5m"
+              value_type: FLOAT
+              units: "%"
+              description: |
+                Returns the free space percentage on drive {#DISK_LETTER}.
+                Discovered via low-level discovery of fixed drives.
+              tags:
+                - tag: "component"
+                  value: "role-health"
+                - tag: "scope"
+                  value: "disk-capacity"
+                - tag: "priority"
+                  value: "info"
+
+            - uuid: "ad261000-0000-4000-8000-000000000002"
+              name: "{#DISK_LETTER}: free space (GB)"
+              type: ZABBIX_PASSIVE
+              key_: "windows.health.disk.gb[{#DISK_LETTER}]"
+              delay: "5m"
+              value_type: FLOAT
+              units: "GB"
+              description: |
+                Returns the free space in GB on drive {#DISK_LETTER}.
+                Discovered via low-level discovery of fixed drives.
+              tags:
+                - tag: "component"
+                  value: "role-health"
+                - tag: "scope"
+                  value: "disk-capacity"
+                - tag: "priority"
+                  value: "info"
+
+          trigger_prototypes: []
+
+      macros:
+        - macro: "{$ROLE_DISK_FREE_PCT_WARN}"
+          value: "15"
+          description: "Warning threshold for role-relevant volume free space percentage"
+        - macro: "{$ROLE_DISK_FREE_PCT_CRIT}"
+          value: "10"
+          description: "Critical threshold for role-relevant volume free space percentage"
+        - macro: "{$ROLE_DISK_FREE_GB_WARN}"
+          value: "25"
+          description: "Warning threshold for role-relevant volume free space in GB"
+        - macro: "{$ROLE_DISK_FREE_GB_CRIT}"
+          value: "15"
+          description: "Critical threshold for role-relevant volume free space in GB"
+
+      dashboards: []
+      graphs: []
+      http_tests: []
+      template_link: []

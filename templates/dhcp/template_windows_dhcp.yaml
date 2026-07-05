@@ -1,0 +1,393 @@
+zabbix_export:
+  version: '6.0'
+  date: '2026-07-05T12:00:00Z'
+  template_groups:
+    - uuid: "ad100000-0000-4000-8000-000000000002"
+      name: "Templates/Windows/DHCP"
+  templates:
+    - uuid: "ad200000-0000-4000-8000-000000000002"
+      template: "Windows DHCP by Zabbix agent"
+      name: "Windows DHCP by Zabbix agent"
+      description: |
+        Template for monitoring DHCP Server role on Windows Server.
+        Monitors DHCPServer service availability, scope free-address capacity
+        (via low-level discovery), DHCP authorization in AD, failover state,
+        and critical DHCP-related Windows Event Log events.
+
+        Dependencies:
+        - Zabbix agent 6.0+ with UserParameter definitions (see README)
+        - PowerShell 5.1+ with DHCP server modules installed
+        - PowerShell scripts in /scripts/windows/ directory
+        - Access to run Get-DhcpServerv4Scope and related DHCP cmdlets
+      vendor:
+        name: "Nous Research"
+        version: "1.0.0"
+      groups:
+        - name: "Templates/Windows/DHCP"
+      items:
+        # 1. DHCPServer service status
+        - uuid: "ad220000-0000-4000-8000-000000000001"
+          name: "DHCP: DHCPServer service status"
+          type: ZABBIX_PASSIVE
+          key_: "windows.dhcp.service.status"
+          delay: "1m"
+          value_type: UNSIGNED
+          description: |
+            Checks the DHCPServer service status via PowerShell Get-Service.
+            Returns 1 if Running, 0 if not running or stopped.
+          tags:
+            - tag: "component"
+              value: "dhcp"
+            - tag: "scope"
+              value: "availability"
+            - tag: "priority"
+              value: "critical"
+          triggers:
+            - uuid: "ad221000-0000-4000-8000-000000000001"
+              expression: "avg(/Windows DHCP by Zabbix agent/windows.dhcp.service.status,{$DHCP_SERVICE_DOWN_TIMEOUT})=0"
+              name: "DHCP: DHCPServer service is not running on {HOST.HOST}"
+              priority: CRITICAL
+              description: |
+                The DHCPServer service has been stopped for more than
+                {$DHCP_SERVICE_DOWN_TIMEOUT}. DHCP clients will not
+                receive IP address leases.
+                Severity: CRITICAL when sustained for {$DHCP_SERVICE_DOWN_TIMEOUT}.
+              tags:
+                - tag: "component"
+                  value: "dhcp"
+                - tag: "scope"
+                  value: "availability"
+                - tag: "priority"
+                  value: "critical"
+
+        # 3. DHCP authorization in AD status
+        - uuid: "ad220000-0000-4000-8000-000000000002"
+          name: "DHCP: Authorization in AD"
+          type: ZABBIX_PASSIVE
+          key_: "windows.dhcp.authorization.status"
+          delay: "5m"
+          value_type: UNSIGNED
+          description: |
+            Checks whether the DHCP server is authorized in Active Directory
+            via PowerShell Get-DhcpServerInDC. Returns 1 if authorized,
+            0 if unauthorized (will not issue leases).
+          tags:
+            - tag: "component"
+              value: "dhcp"
+            - tag: "scope"
+              value: "authorization"
+            - tag: "priority"
+              value: "critical"
+          triggers:
+            - uuid: "ad221000-0000-4000-8000-000000000002"
+              expression: "last(/Windows DHCP by Zabbix agent/windows.dhcp.authorization.status)=0"
+              name: "DHCP: Server unauthorized in AD on {HOST.HOST}"
+              priority: CRITICAL
+              description: |
+                The DHCP server is not authorized in Active Directory.
+                It will not issue leases to DHCP clients until authorized.
+                Severity: CRITICAL (immediate).
+              tags:
+                - tag: "component"
+                  value: "dhcp"
+                - tag: "scope"
+                  value: "authorization"
+                - tag: "priority"
+                  value: "critical"
+
+        # 4. DHCP Event 1046 (unauthorized) via Event Log
+        - uuid: "ad220000-0000-4000-8000-000000000003"
+          name: "DHCP: Event 1046 (server unauthorized)"
+          type: ZABBIX_ACTIVE
+          key_: "eventlog[System,,1046,DhcpServer,,,,0]"
+          delay: "0"
+          value_type: LOG
+          description: |
+            Monitors System event log for DHCP Event ID 1046 (source: DhcpServer).
+            Indicates that the DHCP server has been detected as unauthorized
+            in Active Directory by another DHCP server on the network.
+          tags:
+            - tag: "component"
+              value: "dhcp"
+            - tag: "scope"
+              value: "authorization"
+            - tag: "priority"
+              value: "critical"
+          triggers:
+            - uuid: "ad221000-0000-4000-8000-000000000003"
+              expression: "last(/Windows DHCP by Zabbix agent/eventlog[System,,1046,DhcpServer,,,,0])>0"
+              name: "DHCP: Event 1046 - server unauthorized detected on {HOST.HOST}"
+              priority: CRITICAL
+              description: |
+                Event ID 1046 detected. Another DHCP server has detected this
+                server as unauthorized in Active Directory. The DHCP service
+                will not respond to client requests.
+                Severity: CRITICAL (immediate).
+              tags:
+                - tag: "component"
+                  value: "dhcp"
+                - tag: "scope"
+                  value: "authorization"
+                - tag: "priority"
+                  value: "critical"
+
+        # 5. DHCP Event 1051 via Event Log
+        - uuid: "ad220000-0000-4000-8000-000000000004"
+          name: "DHCP: Event 1051"
+          type: ZABBIX_ACTIVE
+          key_: "eventlog[System,,1051,DhcpServer,,,,0]"
+          delay: "0"
+          value_type: LOG
+          description: |
+            Monitors System event log for DHCP Event ID 1051 (source: DhcpServer).
+            Indicates a DHCP server service configuration or operational issue.
+          tags:
+            - tag: "component"
+              value: "dhcp"
+            - tag: "scope"
+              value: "operational"
+            - tag: "priority"
+              value: "critical"
+          triggers:
+            - uuid: "ad221000-0000-4000-8000-000000000004"
+              expression: "last(/Windows DHCP by Zabbix agent/eventlog[System,,1051,DhcpServer,,,,0])>0"
+              name: "DHCP: Event 1051 detected on {HOST.HOST}"
+              priority: CRITICAL
+              description: |
+                Event ID 1051 detected from DHCP Server source.
+                This indicates a DHCP service configuration or operational issue
+                that requires investigation.
+                Severity: CRITICAL (immediate).
+              tags:
+                - tag: "component"
+                  value: "dhcp"
+                - tag: "scope"
+                  value: "operational"
+                - tag: "priority"
+                  value: "critical"
+
+        # 7. DHCP CommDown state monitoring
+        - uuid: "ad220000-0000-4000-8000-000000000005"
+          name: "DHCP: Failover CommDown state"
+          type: ZABBIX_PASSIVE
+          key_: "windows.dhcp.failover.commdown"
+          delay: "1m"
+          value_type: UNSIGNED
+          description: |
+            Checks for DHCP failover scopes in CommDown (communication down)
+            state via PowerShell. Returns count of scopes in CommDown state.
+            0 indicates no communication issues.
+          tags:
+            - tag: "component"
+              value: "dhcp"
+            - tag: "scope"
+              value: "failover"
+            - tag: "priority"
+              value: "critical"
+          triggers:
+            - uuid: "ad221000-0000-4000-8000-000000000005"
+              expression: "min(/Windows DHCP by Zabbix agent/windows.dhcp.failover.commdown,{$DHCP_FAILOVER_TIMEOUT})>0"
+              name: "DHCP: Failover CommDown state detected on {HOST.HOST}"
+              priority: CRITICAL
+              description: |
+                One or more DHCP failover scopes are in CommDown state for
+                more than {$DHCP_FAILOVER_TIMEOUT}. Communication between
+                failover partners is interrupted.
+                Severity: CRITICAL when sustained for {$DHCP_FAILOVER_TIMEOUT}.
+              tags:
+                - tag: "component"
+                  value: "dhcp"
+                - tag: "scope"
+                  value: "failover"
+                - tag: "priority"
+                  value: "critical"
+
+        # 8. DHCP PARTNER DOWN state monitoring
+        - uuid: "ad220000-0000-4000-8000-000000000006"
+          name: "DHCP: Failover PARTNER DOWN state"
+          type: ZABBIX_PASSIVE
+          key_: "windows.dhcp.failover.partnerdown"
+          delay: "1m"
+          value_type: UNSIGNED
+          description: |
+            Checks for DHCP failover scopes in PARTNER DOWN state via
+            PowerShell. Returns count of scopes where failover partner
+            is unavailable. 0 indicates all partners reachable.
+          tags:
+            - tag: "component"
+              value: "dhcp"
+            - tag: "scope"
+              value: "failover"
+            - tag: "priority"
+              value: "critical"
+          triggers:
+            - uuid: "ad221000-0000-4000-8000-000000000006"
+              expression: "min(/Windows DHCP by Zabbix agent/windows.dhcp.failover.partnerdown,{$DHCP_FAILOVER_TIMEOUT})>0"
+              name: "DHCP: Failover PARTNER DOWN state detected on {HOST.HOST}"
+              priority: CRITICAL
+              description: |
+                One or more DHCP failover partners are in PARTNER DOWN state
+                for more than {$DHCP_FAILOVER_TIMEOUT}. The failover partner
+                is unreachable.
+                Severity: CRITICAL when sustained for {$DHCP_FAILOVER_TIMEOUT}.
+              tags:
+                - tag: "component"
+                  value: "dhcp"
+                - tag: "scope"
+                  value: "failover"
+                - tag: "priority"
+                  value: "critical"
+
+      discovery_rules:
+        # LLD: Discover DHCP scopes
+        - uuid: "ad230000-0000-4000-8000-000000000001"
+          name: "DHCP: Scope discovery"
+          type: ZABBIX_PASSIVE
+          key_: "windows.dhcp.discover.scopes"
+          delay: "1h"
+          value_type: TEXT
+          description: |
+            Discovers all IPv4 DHCP scopes via PowerShell
+            Get-DhcpServerv4Scope. Returns a JSON array of scope objects
+            with {#SCOPE_ID}, {#SCOPE_NAME}, {#SCOPE_SUBNETMASK} macros.
+          filter:
+            evaltype: AND
+            conditions:
+              - macro: "{#SCOPE_ID}"
+                value: ".*"
+                formulaid: A
+          item_prototypes:
+            # 2. DHCP scope free-address percentage via LLD
+            - uuid: "ad231000-0000-4000-8000-000000000001"
+              name: "DHCP: Scope {#SCOPE_ID} ({#SCOPE_NAME}) free address percentage"
+              type: ZABBIX_PASSIVE
+              key_: "windows.dhcp.scope.free.pct[{#SCOPE_ID}]"
+              delay: "5m"
+              value_type: FLOAT
+              units: "%"
+              description: |
+                Returns the percentage of free addresses in DHCP scope
+                {#SCOPE_ID} ({#SCOPE_NAME}). Calculated from
+                Get-DhcpServerv4ScopeStatistics.
+              tags:
+                - tag: "component"
+                  value: "dhcp"
+                - tag: "scope"
+                  value: "capacity"
+                - tag: "priority"
+                  value: "high"
+              triggers:
+                - uuid: "ad232000-0000-4000-8000-000000000001"
+                  expression: "last(/Windows DHCP by Zabbix agent/windows.dhcp.scope.free.pct[{#SCOPE_ID}])<{$DHCP_FREE_PCT_WARN}"
+                  name: "DHCP: Scope {#SCOPE_ID} ({#SCOPE_NAME}) free addresses below {$DHCP_FREE_PCT_WARN}% on {HOST.HOST}"
+                  priority: HIGH
+                  description: |
+                    Free address pool in scope {#SCOPE_NAME} ({#SCOPE_ID})
+                    is below {$DHCP_FREE_PCT_WARN}%. Consider expanding
+                    the scope or reclaiming unused leases.
+                    Severity: HIGH.
+                  tags:
+                    - tag: "component"
+                      value: "dhcp"
+                    - tag: "scope"
+                      value: "capacity"
+                    - tag: "priority"
+                      value: "high"
+                - uuid: "ad232000-0000-4000-8000-000000000002"
+                  expression: "last(/Windows DHCP by Zabbix agent/windows.dhcp.scope.free.pct[{#SCOPE_ID}])<{$DHCP_FREE_PCT_CRIT} or last(/Windows DHCP by Zabbix agent/windows.dhcp.scope.free.count[{#SCOPE_ID}])<{$DHCP_MIN_FREE_ADDR}"
+                  name: "DHCP: Scope {#SCOPE_ID} ({#SCOPE_NAME}) critically low on free addresses on {HOST.HOST}"
+                  priority: CRITICAL
+                  description: |
+                    Free address pool in scope {#SCOPE_NAME} ({#SCOPE_ID})
+                    is below {$DHCP_FREE_PCT_CRIT}% or fewer than
+                    {$DHCP_MIN_FREE_ADDR} addresses remain. Immediate
+                    action required to prevent address exhaustion.
+                    Severity: CRITICAL.
+                  tags:
+                    - tag: "component"
+                      value: "dhcp"
+                    - tag: "scope"
+                      value: "capacity"
+                    - tag: "priority"
+                      value: "critical"
+
+            # Count of free addresses (used by trigger above)
+            - uuid: "ad231000-0000-4000-8000-000000000002"
+              name: "DHCP: Scope {#SCOPE_ID} ({#SCOPE_NAME}) free address count"
+              type: ZABBIX_PASSIVE
+              key_: "windows.dhcp.scope.free.count[{#SCOPE_ID}]"
+              delay: "5m"
+              value_type: UNSIGNED
+              description: |
+                Returns the count of free addresses remaining in DHCP scope
+                {#SCOPE_ID} ({#SCOPE_NAME}). Used as secondary condition
+                for capacity-critical trigger evaluation.
+              tags:
+                - tag: "component"
+                  value: "dhcp"
+                - tag: "scope"
+                  value: "capacity"
+                - tag: "priority"
+                  value: "high"
+
+            # 6. DHCP failover state via LLD + PowerShell
+            - uuid: "ad231000-0000-4000-8000-000000000003"
+              name: "DHCP: Scope {#SCOPE_ID} ({#SCOPE_NAME}) failover state"
+              type: ZABBIX_PASSIVE
+              key_: "windows.dhcp.scope.failover.state[{#SCOPE_ID}]"
+              delay: "1m"
+              value_type: UNSIGNED
+              description: |
+                Returns the failover state of DHCP scope {#SCOPE_ID}
+                ({#SCOPE_NAME}). 0=NORMAL, 1=CommDown, 2=PARTNER DOWN,
+                or other state codes. Exists only for scopes with
+                configured failover relationships.
+              tags:
+                - tag: "component"
+                  value: "dhcp"
+                - tag: "scope"
+                  value: "failover"
+                - tag: "priority"
+                  value: "critical"
+              triggers:
+                - uuid: "ad232000-0000-4000-8000-000000000003"
+                  expression: "min(/Windows DHCP by Zabbix agent/windows.dhcp.scope.failover.state[{#SCOPE_ID}],{$DHCP_FAILOVER_TIMEOUT})<>0"
+                  name: "DHCP: Scope {#SCOPE_ID} ({#SCOPE_NAME}) failover state not NORMAL on {HOST.HOST}"
+                  priority: CRITICAL
+                  description: |
+                    DHCP scope {#SCOPE_NAME} ({#SCOPE_ID}) failover state
+                    has not returned to NORMAL for more than
+                    {$DHCP_FAILOVER_TIMEOUT}. Check failover partner
+                    connectivity.
+                    Severity: CRITICAL when sustained for {$DHCP_FAILOVER_TIMEOUT}.
+                  tags:
+                    - tag: "component"
+                      value: "dhcp"
+                    - tag: "scope"
+                      value: "failover"
+                    - tag: "priority"
+                      value: "critical"
+
+          trigger_prototypes: []
+
+      macros:
+        - macro: "{$DHCP_SERVICE_DOWN_TIMEOUT}"
+          value: "2m"
+          description: "Time after which DHCPServer service downtime escalates to CRITICAL"
+        - macro: "{$DHCP_FREE_PCT_WARN}"
+          value: "20"
+          description: "Warning threshold for DHCP scope free address percentage"
+        - macro: "{$DHCP_FREE_PCT_CRIT}"
+          value: "10"
+          description: "Critical threshold for DHCP scope free address percentage"
+        - macro: "{$DHCP_MIN_FREE_ADDR}"
+          value: "20"
+          description: "Minimum free address count before CRITICAL alert"
+        - macro: "{$DHCP_FAILOVER_TIMEOUT}"
+          value: "5m"
+          description: "Time after which abnormal failover state escalates to CRITICAL"
+
+      dashboards: []
+      graphs: []
+      http_tests: []
+      template_link: []
