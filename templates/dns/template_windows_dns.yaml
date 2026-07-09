@@ -1,6 +1,5 @@
 zabbix_export:
-  version: '6.0'
-  date: '2026-07-05T12:00:00Z'
+  version: '7.4'
   template_groups:
     - uuid: "ad100000-0000-4000-8000-000000000003"
       name: "Templates/Windows/DNS"
@@ -29,7 +28,7 @@ zabbix_export:
         - uuid: "ad240000-0000-4000-8000-000000000001"
           name: "DNS: DNS Server service status"
           type: ZABBIX_PASSIVE
-          key_: "windows.dns.service.status"
+          key: "windows.dns.service.status"
           delay: "1m"
           value_type: UNSIGNED
           description: |
@@ -64,7 +63,7 @@ zabbix_export:
         - uuid: "ad240000-0000-4000-8000-000000000002"
           name: "DNS: A record query result"
           type: ZABBIX_PASSIVE
-          key_: "windows.dns.query.a"
+          key: "windows.dns.query.a"
           delay: "5m"
           value_type: UNSIGNED
           description: |
@@ -83,7 +82,7 @@ zabbix_export:
         - uuid: "ad240000-0000-4000-8000-000000000003"
           name: "DNS: SOA query result"
           type: ZABBIX_PASSIVE
-          key_: "windows.dns.query.soa"
+          key: "windows.dns.query.soa"
           delay: "5m"
           value_type: UNSIGNED
           description: |
@@ -102,7 +101,7 @@ zabbix_export:
         - uuid: "ad240000-0000-4000-8000-000000000004"
           name: "DNS: _ldap._tcp.dc._msdcs SRV record count"
           type: ZABBIX_PASSIVE
-          key_: "windows.dns.query.srv.ldap"
+          key: "windows.dns.query.srv.ldap"
           delay: "5m"
           value_type: UNSIGNED
           description: |
@@ -155,7 +154,7 @@ zabbix_export:
         - uuid: "ad240000-0000-4000-8000-00000000000a"
           name: "DNS: DNS Server uptime (seconds)"
           type: ZABBIX_PASSIVE
-          key_: "windows.dns.service.uptime"
+          key: "windows.dns.service.uptime"
           delay: "1m"
           value_type: UNSIGNED
           units: "s"
@@ -175,7 +174,7 @@ zabbix_export:
         - uuid: "ad240000-0000-4000-8000-000000000005"
           name: "DNS: Event 4013 (AD startup delay)"
           type: ZABBIX_ACTIVE
-          key_: "eventlog[DNS Server,,4013,,,,0]"
+          key: "eventlog[DNS Server,,4013,,,,0]"
           delay: "0"
           value_type: LOG
           description: |
@@ -229,7 +228,7 @@ zabbix_export:
         - uuid: "ad240000-0000-4000-8000-000000000006"
           name: "DNS: Event 4013 unexpected (outside maintenance)"
           type: ZABBIX_ACTIVE
-          key_: "eventlog[DNS Server,,4013,,,,0]"
+          key: "eventlog[DNS Server,,4013,,,,0]"
           delay: "0"
           value_type: LOG
           description: |
@@ -274,7 +273,4 @@ zabbix_export:
           description: "Time after which persistent Event 4013 escalates to CRITICAL"
 
       dashboards: []
-      discovery_rules: []
-      graphs: []
-      http_tests: []
-      template_link: []
+

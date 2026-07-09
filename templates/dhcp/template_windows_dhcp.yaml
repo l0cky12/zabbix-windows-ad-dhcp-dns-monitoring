@@ -1,6 +1,5 @@
 zabbix_export:
-  version: '6.0'
-  date: '2026-07-05T12:00:00Z'
+  version: '7.4'
   template_groups:
     - uuid: "ad100000-0000-4000-8000-000000000002"
       name: "Templates/Windows/DHCP"
@@ -29,7 +28,7 @@ zabbix_export:
         - uuid: "ad220000-0000-4000-8000-000000000001"
           name: "DHCP: DHCPServer service status"
           type: ZABBIX_PASSIVE
-          key_: "windows.dhcp.service.status"
+          key: "windows.dhcp.service.status"
           delay: "1m"
           value_type: UNSIGNED
           description: |
@@ -64,7 +63,7 @@ zabbix_export:
         - uuid: "ad220000-0000-4000-8000-000000000002"
           name: "DHCP: Authorization in AD"
           type: ZABBIX_PASSIVE
-          key_: "windows.dhcp.authorization.status"
+          key: "windows.dhcp.authorization.status"
           delay: "5m"
           value_type: UNSIGNED
           description: |
@@ -99,7 +98,7 @@ zabbix_export:
         - uuid: "ad220000-0000-4000-8000-000000000003"
           name: "DHCP: Event 1046 (server unauthorized)"
           type: ZABBIX_ACTIVE
-          key_: "eventlog[System,,1046,DhcpServer,,,,0]"
+          key: "eventlog[System,,1046,DhcpServer,,,,0]"
           delay: "0"
           value_type: LOG
           description: |
@@ -135,7 +134,7 @@ zabbix_export:
         - uuid: "ad220000-0000-4000-8000-000000000004"
           name: "DHCP: Event 1051"
           type: ZABBIX_ACTIVE
-          key_: "eventlog[System,,1051,DhcpServer,,,,0]"
+          key: "eventlog[System,,1051,DhcpServer,,,,0]"
           delay: "0"
           value_type: LOG
           description: |
@@ -170,7 +169,7 @@ zabbix_export:
         - uuid: "ad220000-0000-4000-8000-000000000005"
           name: "DHCP: Failover CommDown state"
           type: ZABBIX_PASSIVE
-          key_: "windows.dhcp.failover.commdown"
+          key: "windows.dhcp.failover.commdown"
           delay: "1m"
           value_type: UNSIGNED
           description: |
@@ -206,7 +205,7 @@ zabbix_export:
         - uuid: "ad220000-0000-4000-8000-000000000006"
           name: "DHCP: Failover PARTNER DOWN state"
           type: ZABBIX_PASSIVE
-          key_: "windows.dhcp.failover.partnerdown"
+          key: "windows.dhcp.failover.partnerdown"
           delay: "1m"
           value_type: UNSIGNED
           description: |
@@ -243,7 +242,7 @@ zabbix_export:
         - uuid: "ad230000-0000-4000-8000-000000000001"
           name: "DHCP: Scope discovery"
           type: ZABBIX_PASSIVE
-          key_: "windows.dhcp.discover.scopes"
+          key: "windows.dhcp.discover.scopes"
           delay: "1h"
           value_type: TEXT
           description: |
@@ -261,7 +260,7 @@ zabbix_export:
             - uuid: "ad231000-0000-4000-8000-000000000001"
               name: "DHCP: Scope {#SCOPE_ID} ({#SCOPE_NAME}) free address percentage"
               type: ZABBIX_PASSIVE
-              key_: "windows.dhcp.scope.free.pct[{#SCOPE_ID}]"
+              key: "windows.dhcp.scope.free.pct[{#SCOPE_ID}]"
               delay: "5m"
               value_type: FLOAT
               units: "%"
@@ -315,7 +314,7 @@ zabbix_export:
             - uuid: "ad231000-0000-4000-8000-000000000002"
               name: "DHCP: Scope {#SCOPE_ID} ({#SCOPE_NAME}) free address count"
               type: ZABBIX_PASSIVE
-              key_: "windows.dhcp.scope.free.count[{#SCOPE_ID}]"
+              key: "windows.dhcp.scope.free.count[{#SCOPE_ID}]"
               delay: "5m"
               value_type: UNSIGNED
               description: |
@@ -334,7 +333,7 @@ zabbix_export:
             - uuid: "ad231000-0000-4000-8000-000000000003"
               name: "DHCP: Scope {#SCOPE_ID} ({#SCOPE_NAME}) failover state"
               type: ZABBIX_PASSIVE
-              key_: "windows.dhcp.scope.failover.state[{#SCOPE_ID}]"
+              key: "windows.dhcp.scope.failover.state[{#SCOPE_ID}]"
               delay: "1m"
               value_type: UNSIGNED
               description: |
@@ -388,6 +387,4 @@ zabbix_export:
           description: "Time after which abnormal failover state escalates to CRITICAL"
 
       dashboards: []
-      graphs: []
-      http_tests: []
-      template_link: []
+

@@ -1,6 +1,5 @@
 zabbix_export:
-  version: '6.0'
-  date: '2026-07-05T12:00:00Z'
+  version: '7.4'
   template_groups:
     - uuid: "ad100000-0000-4000-8000-000000000004"
       name: "Templates/Windows/Role Health"
@@ -34,7 +33,7 @@ zabbix_export:
         - uuid: "ad250000-0000-4000-8000-000000000001"
           name: "Role Health: W32Time service status"
           type: ZABBIX_PASSIVE
-          key_: "windows.health.w32time.status"
+          key: "windows.health.w32time.status"
           delay: "1m"
           value_type: UNSIGNED
           description: |
@@ -53,7 +52,7 @@ zabbix_export:
         - uuid: "ad250000-0000-4000-8000-000000000002"
           name: "Role Health: Time sync offset (seconds)"
           type: ZABBIX_PASSIVE
-          key_: "windows.health.time.offset"
+          key: "windows.health.time.offset"
           delay: "1m"
           value_type: UNSIGNED
           units: "s"
@@ -72,7 +71,7 @@ zabbix_export:
         - uuid: "ad250000-0000-4000-8000-000000000003"
           name: "Role Health: NTDS database volume free space (%)"
           type: ZABBIX_PASSIVE
-          key_: "windows.health.disk.ntds.pct"
+          key: "windows.health.disk.ntds.pct"
           delay: "5m"
           value_type: FLOAT
           units: "%"
@@ -127,7 +126,7 @@ zabbix_export:
         - uuid: "ad250000-0000-4000-8000-000000000004"
           name: "Role Health: NTDS database volume free space (GB)"
           type: ZABBIX_PASSIVE
-          key_: "windows.health.disk.ntds.gb"
+          key: "windows.health.disk.ntds.gb"
           delay: "5m"
           value_type: FLOAT
           units: "GB"
@@ -146,7 +145,7 @@ zabbix_export:
         - uuid: "ad250000-0000-4000-8000-000000000005"
           name: "Role Health: AD logs volume free space (%)"
           type: ZABBIX_PASSIVE
-          key_: "windows.health.disk.adlogs.pct"
+          key: "windows.health.disk.adlogs.pct"
           delay: "5m"
           value_type: FLOAT
           units: "%"
@@ -199,7 +198,7 @@ zabbix_export:
         - uuid: "ad250000-0000-4000-8000-000000000006"
           name: "Role Health: AD logs volume free space (GB)"
           type: ZABBIX_PASSIVE
-          key_: "windows.health.disk.adlogs.gb"
+          key: "windows.health.disk.adlogs.gb"
           delay: "5m"
           value_type: FLOAT
           units: "GB"
@@ -218,7 +217,7 @@ zabbix_export:
         - uuid: "ad250000-0000-4000-8000-000000000007"
           name: "Role Health: SYSVOL volume free space (%)"
           type: ZABBIX_PASSIVE
-          key_: "windows.health.disk.sysvol.pct"
+          key: "windows.health.disk.sysvol.pct"
           delay: "5m"
           value_type: FLOAT
           units: "%"
@@ -271,7 +270,7 @@ zabbix_export:
         - uuid: "ad250000-0000-4000-8000-000000000008"
           name: "Role Health: SYSVOL volume free space (GB)"
           type: ZABBIX_PASSIVE
-          key_: "windows.health.disk.sysvol.gb"
+          key: "windows.health.disk.sysvol.gb"
           delay: "5m"
           value_type: FLOAT
           units: "GB"
@@ -290,7 +289,7 @@ zabbix_export:
         - uuid: "ad250000-0000-4000-8000-000000000009"
           name: "Role Health: DHCP data volume free space (%)"
           type: ZABBIX_PASSIVE
-          key_: "windows.health.disk.dhcp.pct"
+          key: "windows.health.disk.dhcp.pct"
           delay: "5m"
           value_type: FLOAT
           units: "%"
@@ -343,7 +342,7 @@ zabbix_export:
         - uuid: "ad250000-0000-4000-8000-00000000000a"
           name: "Role Health: DHCP data volume free space (GB)"
           type: ZABBIX_PASSIVE
-          key_: "windows.health.disk.dhcp.gb"
+          key: "windows.health.disk.dhcp.gb"
           delay: "5m"
           value_type: FLOAT
           units: "GB"
@@ -363,7 +362,7 @@ zabbix_export:
         - uuid: "ad260000-0000-4000-8000-000000000001"
           name: "Role Health: Fixed disk discovery"
           type: ZABBIX_PASSIVE
-          key_: "windows.health.discover.disks"
+          key: "windows.health.discover.disks"
           delay: "1h"
           value_type: TEXT
           description: |
@@ -381,7 +380,7 @@ zabbix_export:
             - uuid: "ad261000-0000-4000-8000-000000000001"
               name: "{#DISK_LETTER}: free space percentage"
               type: ZABBIX_PASSIVE
-              key_: "windows.health.disk.pct[{#DISK_LETTER}]"
+              key: "windows.health.disk.pct[{#DISK_LETTER}]"
               delay: "5m"
               value_type: FLOAT
               units: "%"
@@ -399,7 +398,7 @@ zabbix_export:
             - uuid: "ad261000-0000-4000-8000-000000000002"
               name: "{#DISK_LETTER}: free space (GB)"
               type: ZABBIX_PASSIVE
-              key_: "windows.health.disk.gb[{#DISK_LETTER}]"
+              key: "windows.health.disk.gb[{#DISK_LETTER}]"
               delay: "5m"
               value_type: FLOAT
               units: "GB"
@@ -431,6 +430,4 @@ zabbix_export:
           description: "Critical threshold for role-relevant volume free space in GB"
 
       dashboards: []
-      graphs: []
-      http_tests: []
-      template_link: []
+

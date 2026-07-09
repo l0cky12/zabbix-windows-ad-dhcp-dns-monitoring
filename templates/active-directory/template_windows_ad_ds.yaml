@@ -1,6 +1,5 @@
 zabbix_export:
-  version: '6.0'
-  date: '2026-07-05T12:00:00Z'
+  version: '7.4'
   template_groups:
     - uuid: "ad100000-0000-4000-8000-000000000001"
       name: "Templates/Windows/Active Directory"
@@ -30,7 +29,7 @@ zabbix_export:
         - uuid: "ad210000-0000-4000-8000-000000000001"
           name: "AD: dcdiag /test:Services"
           type: ZABBIX_PASSIVE
-          key_: "windows.ad.dcdiag.services"
+          key: "windows.ad.dcdiag.services"
           delay: "5m"
           value_type: TEXT
           description: |
@@ -65,7 +64,7 @@ zabbix_export:
         - uuid: "ad210000-0000-4000-8000-000000000002"
           name: "AD: dcdiag /test:Advertising"
           type: ZABBIX_PASSIVE
-          key_: "windows.ad.dcdiag.advertising"
+          key: "windows.ad.dcdiag.advertising"
           delay: "5m"
           value_type: TEXT
           description: |
@@ -100,7 +99,7 @@ zabbix_export:
         - uuid: "ad210000-0000-4000-8000-000000000003"
           name: "AD: Replication failure count"
           type: ZABBIX_PASSIVE
-          key_: "windows.ad.replication.failures"
+          key: "windows.ad.replication.failures"
           delay: "5m"
           value_type: UNSIGNED
           description: |
@@ -134,7 +133,7 @@ zabbix_export:
         - uuid: "ad210000-0000-4000-8000-000000000004"
           name: "AD: Oldest replication age (hours)"
           type: ZABBIX_PASSIVE
-          key_: "windows.ad.replication.oldest.age"
+          key: "windows.ad.replication.oldest.age"
           delay: "5m"
           value_type: UNSIGNED
           description: |
@@ -154,7 +153,7 @@ zabbix_export:
         - uuid: "ad210000-0000-4000-8000-000000000005"
           name: "AD: SYSVOL share available"
           type: ZABBIX_PASSIVE
-          key_: "windows.ad.sysvol.share"
+          key: "windows.ad.sysvol.share"
           delay: "5m"
           value_type: UNSIGNED
           description: |
@@ -188,7 +187,7 @@ zabbix_export:
         - uuid: "ad210000-0000-4000-8000-000000000006"
           name: "AD: NETLOGON share available"
           type: ZABBIX_PASSIVE
-          key_: "windows.ad.netlogon.share"
+          key: "windows.ad.netlogon.share"
           delay: "5m"
           value_type: UNSIGNED
           description: |
@@ -222,7 +221,7 @@ zabbix_export:
         - uuid: "ad210000-0000-4000-8000-000000000007"
           name: "AD: DFSR SYSVOL state"
           type: ZABBIX_PASSIVE
-          key_: "windows.ad.dfsr.sysvol.state"
+          key: "windows.ad.dfsr.sysvol.state"
           delay: "5m"
           value_type: UNSIGNED
           description: |
@@ -257,7 +256,7 @@ zabbix_export:
         - uuid: "ad210000-0000-4000-8000-000000000008"
           name: "AD: DFSR Event 2213 (SYSVOL non-authoritative sync)"
           type: ZABBIX_ACTIVE
-          key_: "eventlog[DFS Replication,,2213,,,,0]"
+          key: "eventlog[DFS Replication,,2213,,,,0]"
           delay: "0"
           value_type: LOG
           description: |
@@ -293,7 +292,7 @@ zabbix_export:
         - uuid: "ad210000-0000-4000-8000-000000000009"
           name: "AD: DFSR Event 4012 (SYSVOL replication error)"
           type: ZABBIX_ACTIVE
-          key_: "eventlog[DFS Replication,,4012,,,,0]"
+          key: "eventlog[DFS Replication,,4012,,,,0]"
           delay: "0"
           value_type: LOG
           description: |
@@ -329,7 +328,7 @@ zabbix_export:
         - uuid: "ad210000-0000-4000-8000-000000000010"
           name: "AD: W32Time service status"
           type: ZABBIX_PASSIVE
-          key_: "windows.ad.w32time.status"
+          key: "windows.ad.w32time.status"
           delay: "1m"
           value_type: UNSIGNED
           description: |
@@ -347,7 +346,7 @@ zabbix_export:
         - uuid: "ad210000-0000-4000-8000-000000000011"
           name: "AD: Time sync offset (seconds)"
           type: ZABBIX_PASSIVE
-          key_: "windows.ad.time.offset"
+          key: "windows.ad.time.offset"
           delay: "1m"
           value_type: UNSIGNED
           description: |
@@ -399,7 +398,7 @@ zabbix_export:
         - uuid: "ad210000-0000-4000-8000-000000000012"
           name: "AD: PDC emulator time health"
           type: ZABBIX_PASSIVE
-          key_: "windows.ad.pdc.time.health"
+          key: "windows.ad.pdc.time.health"
           delay: "5m"
           value_type: UNSIGNED
           description: |
@@ -418,7 +417,7 @@ zabbix_export:
         - uuid: "ad210000-0000-4000-8000-000000000013"
           name: "AD: Event 2042 (tombstone lifetime exceeded)"
           type: ZABBIX_ACTIVE
-          key_: "eventlog[Directory Service,,2042,,,,0]"
+          key: "eventlog[Directory Service,,2042,,,,0]"
           delay: "0"
           value_type: LOG
           description: |
@@ -456,7 +455,7 @@ zabbix_export:
         - uuid: "ad210000-0000-4000-8000-000000000014"
           name: "AD: Event 8614 (replication error)"
           type: ZABBIX_ACTIVE
-          key_: "eventlog[Directory Service,,8614,,,,0]"
+          key: "eventlog[Directory Service,,8614,,,,0]"
           delay: "0"
           value_type: LOG
           description: |
@@ -509,7 +508,4 @@ zabbix_export:
           description: "Duration the clock offset must exceed threshold before triggering"
 
       dashboards: []
-      discovery_rules: []
-      graphs: []
-      http_tests: []
-      template_link: []
+
